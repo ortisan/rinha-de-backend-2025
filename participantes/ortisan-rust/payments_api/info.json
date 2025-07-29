@@ -1,0 +1,10 @@
+{
+    "name": "Marcelo Ortiz de Santana",
+    "social": ["https://www.linkedin.com/in/marcelo-ortiz-de-santana-495165a4"],
+    "source-code-repo": "https://github.com/ortisan/rinha-de-backend-2025",
+    "langs": ["rust"],
+    "storages": ["postgresql", "redis"],
+    "messaging": ["redis"],
+    "load-balancers": ["nginx"],
+    "other-technologies": []
+}
