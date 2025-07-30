@@ -11,3 +11,4 @@ r2d2 = "0.8.10"
 redis = "0.32.4"
 serde = { version = "1.0.219", features = ["derive"] }
 async-trait = "0.1.88"
+dragonfly-client = "1.0.7"

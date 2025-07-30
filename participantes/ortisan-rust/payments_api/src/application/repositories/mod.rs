@@ -1,2 +1,3 @@
 pub mod payment_repository;
-pub mod data;
+pub mod models;
+mod schema;

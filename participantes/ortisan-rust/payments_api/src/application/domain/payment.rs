@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Queryable)]
 pub struct Payment {
-    pub id: Option<String>,
     pub correlation_id: String,
     pub amount: f64,
     pub requested_at: String // TODO change to temporal
