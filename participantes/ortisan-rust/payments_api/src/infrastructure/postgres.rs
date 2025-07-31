@@ -24,8 +24,7 @@ pub struct PostgresPaymentRepository {
 
 impl PostgresPaymentRepository {
     pub fn new(db_config: DbConfig) -> Self {
-        let database_url = std::env::var(db_config.database_url).expect("DATABASE_URL must be set");
-        let pool = get_connection(&database_url);
+        let pool = get_connection(&db_config.database_url);
         PostgresPaymentRepository { pool }
     }
 }
