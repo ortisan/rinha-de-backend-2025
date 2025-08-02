@@ -1,11 +1,12 @@
+use chrono::{DateTime, Utc};
 use diesel::Queryable;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Queryable)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Clone)]
 pub struct Payment {
     pub correlation_id: String,
     pub amount: f64,
-    pub requested_at: String // TODO change to temporal
+    pub requested_at: DateTime<Utc>
 }
 
 pub struct PaymentsSummary {

@@ -1,3 +1,3 @@
 pub mod payment_repository;
 pub mod models;
-mod schema;
+pub(crate) mod schema;
