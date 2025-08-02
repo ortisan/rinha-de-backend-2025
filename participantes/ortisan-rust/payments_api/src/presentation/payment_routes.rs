@@ -1,8 +1,10 @@
+use crate::presentation::payment_handlers::{create_payment, get_payments_payments_summary};
 use actix_web::web;
-use crate::presentation::payment_handlers::create_payment;
 
 pub fn routes(config: &mut web::ServiceConfig) {
-    config.service(web::scope("/payments")
-        .service(create_payment)
+    config.service(
+        web::scope("")
+            .service(create_payment)
+            .service(get_payments_payments_summary),
     );
 }

@@ -6,7 +6,7 @@ use crate::application::repositories::payment_repository::PaymentRepository;
 pub struct CreatePaymentUsecase<T: PaymentRepository> {
     repository: T
 }
-
+    
 impl <T: PaymentRepository> CreatePaymentUsecase<T> {
     pub fn new(repository: T) -> Self {
         Self {

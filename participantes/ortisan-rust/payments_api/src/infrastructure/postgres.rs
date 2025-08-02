@@ -2,13 +2,16 @@ use crate::application::domain::payment::{Payment, PaymentsSummary};
 use crate::application::repositories::models::PaymentModel;
 use crate::application::repositories::payment_repository::PaymentRepository;
 use crate::application::repositories::schema::payments;
-use std::clone::Clone;
+use crate::application::repositories::schema::payments::dsl::*;
+use crate::application::repositories::schema::payments::requested_at;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use diesel::PgConnection;
+use bigdecimal::ToPrimitive;
+use chrono::{DateTime, FixedOffset};
 use diesel::dsl::insert_into;
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
+use diesel::PgConnection;
+use std::clone::Clone;
 use std::fmt::Error;
 use std::sync::Arc;
 
@@ -59,11 +62,34 @@ impl PaymentRepository for Arc<PostgresPaymentRepository> {
         Ok(payment)
     }
 
-    async fn summary(
+    async fn get_summary(
         &self,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
+        from: DateTime<FixedOffset>,
+        to: DateTime<FixedOffset>,
     ) -> Result<PaymentsSummary, Error> {
-        todo!()
+        let connection_result = &mut self.pool.get();
+        if connection_result.is_err() {
+            return Err(Error);
+        }
+
+        let query_result = payments
+            .filter(requested_at.between(from.naive_utc(), to.naive_utc()))
+            .load::<PaymentModel>(connection_result.as_mut().unwrap());
+
+        if query_result.is_err() {
+            return Err(Error);
+        }
+
+        let mut payments_query_result: Vec<PaymentModel> = query_result.unwrap();
+        let mut total_payments: u64 = 0;
+        let mut total_amount: f64 = 0.0;
+        for payment in payments_query_result {
+            total_payments += 1;
+            total_amount += payment.amount.to_f64().unwrap();
+        }
+        Ok(PaymentsSummary {
+            total_payments: total_payments,
+            total_amount: total_amount,
+        })
     }
 }

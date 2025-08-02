@@ -1,6 +1,6 @@
 use crate::application::domain::payment::Payment;
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
-use chrono::{DateTime, NaiveDateTime};
+use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use diesel::{Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 
@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 #[diesel(table_name = crate::application::repositories::schema::payments)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct PaymentModel {
-    correlation_id: String,
-    amount: BigDecimal,
-    requested_at: NaiveDateTime,
+    pub correlation_id: String,
+    pub amount: BigDecimal,
+    pub requested_at: NaiveDateTime,
 }
 
 impl From<Payment> for PaymentModel {
@@ -18,7 +18,7 @@ impl From<Payment> for PaymentModel {
         PaymentModel {
             correlation_id: payment.correlation_id,
             amount: BigDecimal::from_f64(payment.amount).unwrap(),
-            requested_at: payment.requested_at.naive_local(),
+            requested_at: payment.requested_at.naive_utc(),
         }
     }
 }
@@ -28,7 +28,10 @@ impl From<PaymentModel> for Payment {
         Payment {
             correlation_id: value.correlation_id,
             amount: value.amount.to_f64().unwrap_or_default(),
-            requested_at: DateTime::from_timestamp_nanos(value.requested_at.timestamp_nanos()),
+            requested_at: DateTime::<FixedOffset>::from_naive_utc_and_offset(
+                value.requested_at,
+                FixedOffset::east_opt(0).unwrap(),
+            ),
         }
     }
 }
