@@ -15,3 +15,4 @@ dragonfly-client = "1.0.7"
 bigdecimal = { version = "0.4.8", features = ["serde"] }
 dotenv = "0.15.0"
 env_logger = "0.11.8"
+reqwest = "0.12.22"
