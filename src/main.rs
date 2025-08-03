@@ -10,6 +10,7 @@ use actix_web::{App, HttpServer, web};
 use env_logger;
 use redis::Client;
 use std::sync::Arc;
+use tokio;
 
 mod application;
 mod constants;
@@ -59,6 +60,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let get_summary_usecase = GetPaymentsSummaryUsecase::new(payment_repository.clone());
     let app_data_get_summary_usecase = web::Data::new(get_summary_usecase);
 
+    let create_payment_usecase =
+        CreatePaymentUsecase::new(create_payment_config, payment_repository.clone());
+
+    tokio::spawn(async move {
+        let worker = Worker::new(redis_client.clone(), create_payment_usecase);
+        worker
+            .listen_for_payments()
+            .await
+            .expect("Error to listen for payments");
+    });
+
     let result = HttpServer::new(move || {
         App::new()
             .app_data(app_data_accept_payment_usecase.clone())
@@ -69,11 +81,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .bind("0.0.0.0:8080")?
     .run()
     .await?;
-
-    let create_payment_usecase =
-        CreatePaymentUsecase::new(create_payment_config, payment_repository.clone());
-    let worker = Worker::new(redis_client.clone(), create_payment_usecase);
-    worker.listen_for_payments().await?;
 
     Ok(result)
 }

@@ -1,15 +1,14 @@
 use crate::application::domain::payment::Payment;
 use crate::constants::START_PAYMENT_CHANNEL;
-use redis::Commands;
+use redis::{Client, Commands};
 use std::sync::Arc;
 
-
 pub struct AcceptPaymentUsecase {
-    pub redis_client: Arc<redis::Client>,
+    pub redis_client: Arc<Client>,
 }
 
 impl AcceptPaymentUsecase {
-    pub fn new(redis_client: Arc<redis::Client>) -> Self {
+    pub fn new(redis_client: Arc<Client>) -> Self {
         AcceptPaymentUsecase { redis_client }
     }
 
@@ -19,7 +18,8 @@ impl AcceptPaymentUsecase {
         let conn_result = self.redis_client.get_connection();
         match conn_result {
             Ok(mut conn) => {
-                let publish_result: Result<usize, redis::RedisError> = conn.publish(START_PAYMENT_CHANNEL, user_json);
+                let publish_result: Result<usize, redis::RedisError> =
+                    conn.publish(START_PAYMENT_CHANNEL, user_json);
                 match publish_result {
                     Ok(_) => {
                         return Ok(payment);
