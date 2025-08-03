@@ -1,0 +1,1 @@
+pub const START_PAYMENT_CHANNEL: &str = "start_payment";

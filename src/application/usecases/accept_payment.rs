@@ -1,29 +1,37 @@
 use crate::application::domain::payment::Payment;
-use crate::application::repositories::payment_repository::PaymentRepository;
-use std::fmt::Error;
+use crate::constants::START_PAYMENT_CHANNEL;
+use redis::Commands;
+use std::sync::Arc;
 
-#[derive(Clone)]
-pub struct UsecaseConfig {
-    pub payment_processor_default_url: String,
-    pub payment_processor_fallback_url: String,
+
+pub struct AcceptPaymentUsecase {
+    pub redis_client: Arc<redis::Client>,
 }
 
-#[derive(Clone)]
-pub struct CreatePaymentUsecase<T: PaymentRepository> {
-    config: UsecaseConfig,
-    repository: T,
-}
-
-impl<T: PaymentRepository> CreatePaymentUsecase<T> {
-    pub fn new(config: UsecaseConfig, repository: T) -> Self {
-        Self { config, repository }
+impl AcceptPaymentUsecase {
+    pub fn new(redis_client: Arc<redis::Client>) -> Self {
+        AcceptPaymentUsecase { redis_client }
     }
 
-    pub async fn execute(&self, payment: Payment) -> Result<Payment, Error> {
-        let create_result = self.repository.create(payment).await;
-        match create_result {
-            Ok(payment) => Ok(payment),
-            Err(error) => Err(error),
+    pub async fn execute(&self, payment: Payment) -> Result<Payment, redis::RedisError> {
+        let user_json = serde_json::to_string(&payment)?;
+
+        let conn_result = self.redis_client.get_connection();
+        match conn_result {
+            Ok(mut conn) => {
+                let publish_result: Result<usize, redis::RedisError> = conn.publish(START_PAYMENT_CHANNEL, user_json);
+                match publish_result {
+                    Ok(_) => {
+                        return Ok(payment);
+                    }
+                    Err(error) => {
+                        return Err(error);
+                    }
+                }
+            }
+            Err(error) => {
+                return Err(error);
+            }
         }
     }
 }

@@ -1,23 +1,32 @@
-use crate::infrastructure::redis::RedisConfig;
+use crate::application::domain::payment::Payment;
+use crate::application::repositories::payment_repository::PaymentRepository;
+use crate::application::usecases::create_payment::CreatePaymentUsecase;
+use crate::constants::START_PAYMENT_CHANNEL;
+use redis::Client;
+use std::sync::Arc;
 
-pub struct Worker {
-    pub redis_config: RedisConfig,
+pub struct Worker<T: PaymentRepository> {
+    pub redis_client: Arc<Client>,
+    pub create_payment_usecase: CreatePaymentUsecase<T>,
 }
 
-impl Worker {
-    pub fn new(redis_config: RedisConfig) -> Self {
-        Worker { redis_config }
+impl<T: PaymentRepository> Worker<T> {
+    pub fn new(redis_client: Arc<Client>, create_payment_usecase: CreatePaymentUsecase<T>) -> Self {
+        Worker {
+            redis_client,
+            create_payment_usecase,
+        }
     }
 
-    pub fn start_worker(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let client = redis::Client::open(self.redis_config.uri.clone())?;
-        let mut con = client.get_connection()?;
+    pub async fn listen_for_payments(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut con = self.redis_client.get_connection()?;
         let mut pubsub = con.as_pubsub();
-        pubsub.subscribe("payment_process_channel")?;
+        pubsub.subscribe(START_PAYMENT_CHANNEL)?;
         loop {
             let msg = pubsub.get_message()?;
-            let payload: String = msg.get_payload()?;
-            println!("channel '{}': {}", msg.get_channel_name(), payload);
+            let payload_str: String = msg.get_payload()?;
+            let payment: Payment = serde_json::from_str(&payload_str)?;
+            self.create_payment_usecase.execute(payment).await?;
         }
     }
 }

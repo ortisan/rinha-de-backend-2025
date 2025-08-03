@@ -1,6 +1,6 @@
 use crate::application::domain::payment::Payment;
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
-use chrono::{DateTime, FixedOffset, NaiveDateTime};
+use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
 use diesel::{Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 
@@ -28,10 +28,7 @@ impl From<PaymentModel> for Payment {
         Payment {
             correlation_id: value.correlation_id,
             amount: value.amount.to_f64().unwrap_or_default(),
-            requested_at: DateTime::<FixedOffset>::from_naive_utc_and_offset(
-                value.requested_at,
-                FixedOffset::east_opt(0).unwrap(),
-            ),
+            requested_at: value.requested_at.and_utc(),
         }
     }
 }

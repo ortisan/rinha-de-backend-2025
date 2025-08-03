@@ -11,7 +11,7 @@ pub struct PaymentRequest {
 
 impl From<PaymentRequest> for Payment {
     fn from(value: PaymentRequest) -> Self {
-        let requested_at = Utc::now().fixed_offset();
+        let requested_at = Utc::now();
         Payment {
             correlation_id: value.correlation_id,
             amount: value.amount,
@@ -37,8 +37,12 @@ pub struct GetPaymentsSummaryFilter {
 
 impl From<GetPaymentsSummaryFilter> for GetPaymentsFilter {
     fn from(value: GetPaymentsSummaryFilter) -> Self {
-        let from = chrono::DateTime::parse_from_rfc3339(&value.from).unwrap();
-        let to = chrono::DateTime::parse_from_rfc3339(&value.to).unwrap();
+        let from = chrono::DateTime::parse_from_rfc3339(&value.from)
+            .unwrap()
+            .to_utc();
+        let to = chrono::DateTime::parse_from_rfc3339(&value.to)
+            .unwrap()
+            .to_utc();
         GetPaymentsFilter { from, to }
     }
 }
@@ -57,5 +61,5 @@ impl From<PaymentsSummary> for PaymentsSummaryResponse {
             total_payments: value.total_payments,
             total_amount: value.total_amount,
         }
-    }   
+    }
 }

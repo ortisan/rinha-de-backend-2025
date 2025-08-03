@@ -6,11 +6,11 @@ use crate::application::repositories::schema::payments::dsl::*;
 use crate::application::repositories::schema::payments::requested_at;
 use async_trait::async_trait;
 use bigdecimal::ToPrimitive;
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Utc};
+use diesel::PgConnection;
 use diesel::dsl::insert_into;
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
-use diesel::PgConnection;
 use std::clone::Clone;
 use std::fmt::Error;
 use std::sync::Arc;
@@ -64,8 +64,8 @@ impl PaymentRepository for Arc<PostgresPaymentRepository> {
 
     async fn get_summary(
         &self,
-        from: DateTime<FixedOffset>,
-        to: DateTime<FixedOffset>,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
     ) -> Result<PaymentsSummary, Error> {
         let connection_result = &mut self.pool.get();
         if connection_result.is_err() {
@@ -88,8 +88,8 @@ impl PaymentRepository for Arc<PostgresPaymentRepository> {
             total_amount += payment.amount.to_f64().unwrap();
         }
         Ok(PaymentsSummary {
-            total_payments: total_payments,
-            total_amount: total_amount,
+            total_payments,
+            total_amount,
         })
     }
 }

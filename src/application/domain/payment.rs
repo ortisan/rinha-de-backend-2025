@@ -1,3 +1,4 @@
+use chrono::serde::ts_nanoseconds;
 use chrono::{DateTime, FixedOffset, Utc};
 use diesel::Queryable;
 use serde::{Deserialize, Serialize};
@@ -6,13 +7,16 @@ use serde::{Deserialize, Serialize};
 pub struct Payment {
     pub correlation_id: String,
     pub amount: f64,
-    pub requested_at: DateTime<FixedOffset>,
+    #[serde(with = "ts_nanoseconds")]
+    pub requested_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GetPaymentsFilter {
-    pub from: DateTime<FixedOffset>,
-    pub to: DateTime<FixedOffset>,
+    #[serde(with = "ts_nanoseconds")]
+    pub from: DateTime<Utc>,
+    #[serde(with = "ts_nanoseconds")]
+    pub to: DateTime<Utc>,
 }
 
 pub struct PaymentsSummary {
