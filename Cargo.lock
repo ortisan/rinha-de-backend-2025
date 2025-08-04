@@ -1527,6 +1527,7 @@ dependencies = [
  "dotenv",
  "env_logger",
  "features",
+ "log",
  "r2d2",
  "redis",
  "reqwest",

@@ -1,7 +1,7 @@
 use crate::application::domain::payment::{GetPaymentsFilter, PaymentsSummary};
 use crate::application::repositories::payment_repository::PaymentRepository;
 
-use std::fmt::Error;
+use crate::infrastructure;
 
 #[derive(Clone)]
 pub struct GetPaymentsSummaryUsecase<T: PaymentRepository> {
@@ -15,18 +15,12 @@ impl<T: PaymentRepository> GetPaymentsSummaryUsecase<T> {
     pub async fn execute(
         &self,
         get_payments_filter: GetPaymentsFilter,
-    ) -> Result<PaymentsSummary, Error> {
-        let summary_result = self
+    ) -> infrastructure::Result<PaymentsSummary> {
+        let summary = self
             .repository
-            .get_summary(
-                get_payments_filter.from,
-                get_payments_filter.to,
-            )
-            .await;
+            .get_summary(get_payments_filter.from, get_payments_filter.to)
+            .await?;
 
-        match summary_result {
-            Ok(summary) => Ok(summary),
-            Err(e) => Err(e),
-        }
+        Ok(summary)
     }
 }

@@ -1,17 +1,8 @@
-struct HttpClient {
-
-}
+struct HttpClient {}
 
 impl HttpClient {
     fn new() -> Self {
-        HttpClient {
-        }
+        HttpClient {}
     }
-    fn post() {
-        
-    }
-
+    fn post() {}
 }
-
-
-

@@ -1,10 +1,12 @@
 use crate::application::domain::payment::{GetPaymentsFilter, Payment};
+use crate::application::usecases::accept_payment::AcceptPaymentUsecase;
 use crate::application::usecases::get_payments_summary::GetPaymentsSummaryUsecase;
 use crate::infrastructure::postgres::PostgresPaymentRepository;
-use crate::presentation::data::{GetPaymentsSummaryFilter, PaymentRequest, PaymentsSummaryResponse};
-use actix_web::{get, post, web, HttpResponse};
+use crate::presentation::data::{
+    GetPaymentsSummaryFilter, PaymentRequest, PaymentsSummaryResponse,
+};
+use actix_web::{HttpResponse, get, post, web};
 use std::sync::Arc;
-use crate::application::usecases::accept_payment::AcceptPaymentUsecase;
 
 #[post("/payments")]
 pub async fn create_payment(
@@ -43,5 +45,4 @@ pub async fn get_payments_payments_summary(
         }
         Err(error) => HttpResponse::BadRequest().body(error.to_string()),
     }
-
 }

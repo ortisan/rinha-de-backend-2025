@@ -1,6 +1,6 @@
 use crate::application::domain::payment::Payment;
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
-use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use diesel::{Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 
@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 #[diesel(table_name = crate::application::repositories::schema::payments)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct PaymentModel {
+    #[serde(rename = "correlationId")]
     pub correlation_id: String,
     pub amount: BigDecimal,
     pub requested_at: NaiveDateTime,

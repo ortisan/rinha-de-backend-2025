@@ -1,6 +1,9 @@
 use crate::application::domain::payment::Payment;
-use crate::application::repositories::payment_repository::PaymentRepository;
-use std::fmt::Error;
+use crate::infrastructure;
+use chrono::Timelike;
+use redis::{Client, Commands};
+use reqwest::Response;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct UsecaseConfig {
@@ -9,21 +12,59 @@ pub struct UsecaseConfig {
 }
 
 #[derive(Clone)]
-pub struct CreatePaymentUsecase<T: PaymentRepository> {
+pub struct CreatePaymentUsecase {
     config: UsecaseConfig,
-    repository: T,
+    redis_client: Arc<redis::Client>,
+    http_client: Arc<reqwest::Client>,
 }
 
-impl<T: PaymentRepository> CreatePaymentUsecase<T> {
-    pub fn new(config: UsecaseConfig, repository: T) -> Self {
-        Self { config, repository }
+impl CreatePaymentUsecase {
+    pub fn new(
+        config: UsecaseConfig,
+        redis_client: Arc<Client>,
+        http_client: Arc<reqwest::Client>,
+    ) -> Self {
+        CreatePaymentUsecase {
+            config,
+            redis_client,
+            http_client,
+        }
     }
 
-    pub async fn execute(&self, payment: Payment) -> Result<Payment, Error> {
-        let create_result = self.repository.create(payment).await;
-        match create_result {
-            Ok(payment) => Ok(payment),
-            Err(error) => Err(error),
+    pub async fn execute(&mut self, payment: Payment) -> infrastructure::Result<Payment> {
+        let mut response: Response;
+        response = self
+            .http_client
+            .post(format!(
+                "{}/payments",
+                &self.config.payment_processor_default_url
+            ))
+            .json(&payment)
+            .send()
+            .await?;
+
+        if response.status() != 200 {
+            response = self
+                .http_client
+                .post(format!(
+                    "{}/payments",
+                    &self.config.payment_processor_fallback_url
+                ))
+                .json(&payment)
+                .send()
+                .await?;
         }
+
+        if response.status() == 200 {
+            let payment_json = serde_json::to_string(&payment)?;
+            let mut conn = self.redis_client.get_connection()?;
+            let result_zadd: bool = conn.zadd(
+                "payments_processed",
+                payment_json,
+                payment.requested_at.nanosecond(),
+            )?;
+        }
+
+        Ok(payment)
     }
 }

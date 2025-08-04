@@ -53,7 +53,7 @@ export default function () {
     };
 
     // Send POST request to the payments endpoint
-    const response = http.post('http://localhost:8080/payments/', getPayload(), params);
+    const response = http.post('http://localhost:8000/payments/', getPayload(), params);
 
     // Check if the request was successful
     check(response, {
