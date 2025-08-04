@@ -5,13 +5,13 @@ use crate::infrastructure;
 use redis::Client;
 use std::sync::Arc;
 
-pub struct Worker {
-    pub redis_client: Arc<Client>,
-    pub create_payment_usecase: CreatePaymentUsecase,
+pub struct Worker<'a, 'b> {
+    pub redis_client: &'a Arc<Client>,
+    pub create_payment_usecase: CreatePaymentUsecase<'a, 'b>,
 }
 
-impl Worker {
-    pub fn new(redis_client: Arc<Client>, create_payment_usecase: CreatePaymentUsecase) -> Self {
+impl<'a, 'b, 'c> Worker<'a, 'b> {
+    pub fn new(redis_client: &'a Arc<redis::Client>, create_payment_usecase: CreatePaymentUsecase<'a, 'b>) -> Self {
         Worker {
             redis_client,
             create_payment_usecase,
@@ -26,7 +26,7 @@ impl Worker {
             let msg = pubsub.get_message()?;
             let payload_str: String = msg.get_payload()?;
             let payment: Payment = serde_json::from_str(&payload_str)?;
-            self.create_payment_usecase.execute(payment.clone()).await?;
+            self.create_payment_usecase.execute(&payment).await?;
         }
     }
 }

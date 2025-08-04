@@ -1,5 +1,6 @@
 use crate::application::domain::payment::Payment;
 use crate::infrastructure;
+use crate::presentation::data::PaymentResponse;
 use chrono::Timelike;
 use redis::{Client, Commands};
 use reqwest::Response;
@@ -12,17 +13,17 @@ pub struct UsecaseConfig {
 }
 
 #[derive(Clone)]
-pub struct CreatePaymentUsecase {
+pub struct CreatePaymentUsecase<'a, 'b> {
     config: UsecaseConfig,
-    redis_client: Arc<redis::Client>,
-    http_client: Arc<reqwest::Client>,
+    redis_client: &'a Arc<redis::Client>,
+    http_client: &'b Arc<reqwest::Client>,
 }
 
-impl CreatePaymentUsecase {
+impl<'a, 'b, 'c> CreatePaymentUsecase<'a, 'b> {
     pub fn new(
         config: UsecaseConfig,
-        redis_client: Arc<Client>,
-        http_client: Arc<reqwest::Client>,
+        redis_client: &'a Arc<Client>,
+        http_client: &'b Arc<reqwest::Client>,
     ) -> Self {
         CreatePaymentUsecase {
             config,
@@ -31,7 +32,12 @@ impl CreatePaymentUsecase {
         }
     }
 
-    pub async fn execute(&mut self, payment: Payment) -> infrastructure::Result<Payment> {
+    pub async fn execute(
+        &mut self,
+        payment: &'c Payment,
+    ) -> infrastructure::Result<&'c Payment> {
+        let payment_request = PaymentResponse::from(payment);
+
         let mut response: Response;
         response = self
             .http_client
@@ -39,7 +45,7 @@ impl CreatePaymentUsecase {
                 "{}/payments",
                 &self.config.payment_processor_default_url
             ))
-            .json(&payment)
+            .json(&payment_request)
             .send()
             .await?;
 
@@ -50,7 +56,7 @@ impl CreatePaymentUsecase {
                     "{}/payments",
                     &self.config.payment_processor_fallback_url
                 ))
-                .json(&payment)
+                .json(&payment_request)
                 .send()
                 .await?;
         }

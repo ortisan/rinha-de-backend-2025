@@ -1,26 +1,1 @@
-use crate::application::domain::payment::{GetPaymentsFilter, PaymentsSummary};
-use crate::application::repositories::payment_repository::PaymentRepository;
-
-use crate::infrastructure;
-
-#[derive(Clone)]
-pub struct GetPaymentsSummaryUsecase<T: PaymentRepository> {
-    repository: T,
-}
-
-impl<T: PaymentRepository> GetPaymentsSummaryUsecase<T> {
-    pub fn new(repository: T) -> Self {
-        Self { repository }
-    }
-    pub async fn execute(
-        &self,
-        get_payments_filter: GetPaymentsFilter,
-    ) -> infrastructure::Result<PaymentsSummary> {
-        let summary = self
-            .repository
-            .get_summary(get_payments_filter.from, get_payments_filter.to)
-            .await?;
-
-        Ok(summary)
-    }
-}
+use crate::application::domain::payment::{GetPaymentsFilter, Payment, PaymentsSummary};use crate::infrastructure;use chrono::Timelike;use redis::Commands;use std::sync::Arc;#[derive(Clone)]pub struct GetPaymentsSummaryUsecase<'a> {    redis_client: &'a Arc<redis::Client>,}impl<'a> GetPaymentsSummaryUsecase<'a> {    pub fn new(redis_client: &'a Arc<redis::Client>) -> Self {        GetPaymentsSummaryUsecase { redis_client }    }    pub async fn execute(        &self,        get_payments_filter: GetPaymentsFilter,    ) -> infrastructure::Result<PaymentsSummary> {               let min_key = get_payments_filter.from.nanosecond();        let max_key = get_payments_filter.to.nanosecond();        let mut conn = self.redis_client.get_connection()?;        let payments: Vec<String> = conn.zrangebyscore("payments_processed", min_key, max_key)?;        let mut total_payments: u64 = 0;        let mut total_amount: f64 = 0.0;        payments.iter().for_each(|x| {            let payment: Payment = serde_json::from_str(x).unwrap();            total_payments += 1;            total_amount += payment.amount;        });        Ok(PaymentsSummary {            total_payments,            total_amount,        })    }}

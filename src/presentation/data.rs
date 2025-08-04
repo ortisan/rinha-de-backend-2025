@@ -9,6 +9,14 @@ pub struct PaymentRequest {
     amount: f64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PaymentResponse {
+    #[serde(rename = "correlationId")]
+    correlation_id: String,
+    amount: f64,
+    requested_at: DateTime<Utc>,
+}
+
 impl From<PaymentRequest> for Payment {
     fn from(value: PaymentRequest) -> Self {
         let requested_at = Utc::now();
@@ -20,11 +28,12 @@ impl From<PaymentRequest> for Payment {
     }
 }
 
-impl From<Payment> for PaymentRequest {
-    fn from(value: Payment) -> Self {
-        PaymentRequest {
-            correlation_id: value.correlation_id,
+impl From<&Payment> for PaymentResponse {
+    fn from(value: &Payment) -> Self {
+        PaymentResponse {
+            correlation_id: value.correlation_id.clone(),
             amount: value.amount,
+            requested_at: value.requested_at,
         }
     }
 }

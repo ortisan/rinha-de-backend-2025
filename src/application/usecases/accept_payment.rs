@@ -13,7 +13,7 @@ impl AcceptPaymentUsecase {
         AcceptPaymentUsecase { redis_client }
     }
 
-    pub async fn execute(&self, payment: Payment) -> infrastructure::Result<Payment> {
+    pub async fn execute<'a>(&self, payment: &'a Payment) -> infrastructure::Result<&'a Payment> {
         let user_json = serde_json::to_string(&payment)?;
 
         let mut conn = self.redis_client.get_connection()?;
