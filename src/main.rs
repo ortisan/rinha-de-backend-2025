@@ -40,7 +40,7 @@ async fn main() -> infrastructure::Result<()> {
         payment_processor_fallback_url,
     };
 
-    let payment_repository = Arc::new(PostgresPaymentRepository::new(db_config));
+    // let payment_repository = Arc::new(PostgresPaymentRepository::new(db_config));
     let get_summary_usecase = GetPaymentsSummaryUsecase::new(redis_client.clone());
     let app_data_get_summary_usecase = web::Data::new(get_summary_usecase);
 

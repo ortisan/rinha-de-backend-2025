@@ -5,6 +5,7 @@ use chrono::Timelike;
 use redis::{Client, Commands};
 use reqwest::Response;
 use std::sync::Arc;
+use crate::constants::PAYMENTS_KEY;
 
 #[derive(Clone)]
 pub struct UsecaseConfig {
@@ -62,12 +63,13 @@ impl CreatePaymentUsecase {
         }
 
         if response.status() == 200 {
+            let timestamp = payment.requested_at.timestamp_nanos_opt().unwrap();
             let payment_json = serde_json::to_string(&payment)?;
             let mut conn = self.redis_client.get_connection()?;
             let result_zadd: bool = conn.zadd(
-                "payments_processed",
+                PAYMENTS_KEY,
                 payment_json,
-                payment.requested_at.nanosecond(),
+                timestamp,
             )?;
         }
 
