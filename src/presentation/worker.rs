@@ -5,13 +5,13 @@ use crate::infrastructure;
 use redis::Client;
 use std::sync::Arc;
 
-pub struct Worker<'a, 'b> {
-    pub redis_client: &'a Arc<Client>,
-    pub create_payment_usecase: CreatePaymentUsecase<'a, 'b>,
+pub struct Worker {
+    pub redis_client: Arc<Client>,
+    pub create_payment_usecase: CreatePaymentUsecase,
 }
 
-impl<'a, 'b, 'c> Worker<'a, 'b> {
-    pub fn new(redis_client: &'a Arc<redis::Client>, create_payment_usecase: CreatePaymentUsecase<'a, 'b>) -> Self {
+impl Worker {
+    pub fn new(redis_client: Arc<redis::Client>, create_payment_usecase: CreatePaymentUsecase) -> Self {
         Worker {
             redis_client,
             create_payment_usecase,

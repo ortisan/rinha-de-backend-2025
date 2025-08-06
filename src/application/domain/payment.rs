@@ -1,5 +1,5 @@
 use chrono::serde::ts_nanoseconds;
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, Utc};
 use diesel::Queryable;
 use serde::{Deserialize, Serialize};
 

@@ -27,7 +27,7 @@ async fn main() -> infrastructure::Result<()> {
     };
     let redis_uri = dotenv::var("REDIS_URI").expect("REDIS_URI not found");
     let redis_config = RedisConfig { uri: redis_uri };
-    let redis_client = &Arc::new(Client::open(redis_config.uri)?);
+    let redis_client = Arc::new(Client::open(redis_config.uri)?);
     let accept_payment_usecase = AcceptPaymentUsecase::new(redis_client.clone());
     let app_data_accept_payment_usecase = web::Data::new(accept_payment_usecase);
 
@@ -41,15 +41,15 @@ async fn main() -> infrastructure::Result<()> {
     };
 
     let payment_repository = Arc::new(PostgresPaymentRepository::new(db_config));
-    let get_summary_usecase = GetPaymentsSummaryUsecase::new(&redis_client);
+    let get_summary_usecase = GetPaymentsSummaryUsecase::new(redis_client.clone());
     let app_data_get_summary_usecase = web::Data::new(get_summary_usecase);
 
     let http_client = Arc::new(reqwest::Client::new());
     let create_payment_usecase =
-        CreatePaymentUsecase::new(create_payment_config, redis_client, &http_client);
+        CreatePaymentUsecase::new(create_payment_config, redis_client.clone(), http_client.clone());
 
     tokio::spawn(async move {
-        let mut worker = Worker::new(redis_client, create_payment_usecase);
+        let mut worker = Worker::new(redis_client.clone(), create_payment_usecase);
         worker
             .listen_for_payments()
             .await

@@ -1,12 +1,10 @@
 use crate::application::domain::payment::{GetPaymentsFilter, Payment};
 use crate::application::usecases::accept_payment::AcceptPaymentUsecase;
 use crate::application::usecases::get_payments_summary::GetPaymentsSummaryUsecase;
-use crate::infrastructure::postgres::PostgresPaymentRepository;
 use crate::presentation::data::{
     GetPaymentsSummaryFilter, PaymentRequest, PaymentResponse, PaymentsSummaryResponse,
 };
-use actix_web::{HttpResponse, get, post, web};
-use std::sync::Arc;
+use actix_web::{get, post, web, HttpResponse};
 
 #[post("/payments")]
 pub async fn create_payment(
@@ -28,9 +26,7 @@ pub async fn create_payment(
 
 #[get("/payments-summary")]
 pub async fn get_payments_payments_summary(
-    get_payments_summary_usecase: web::Data<
-        GetPaymentsSummaryUsecase<'static>,
-    >,
+    get_payments_summary_usecase: web::Data<GetPaymentsSummaryUsecase>,
     filter: web::Query<GetPaymentsSummaryFilter>,
 ) -> HttpResponse {
     let get_payments_filter = GetPaymentsFilter::from(filter.into_inner());
