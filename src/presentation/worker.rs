@@ -22,8 +22,8 @@ impl Worker {
     }
 
     pub async fn listen_for_payments(&mut self) -> infrastructure::Result<()> {
-        let mut con = self.redis_client.get_connection()?;
-        let mut pubsub = con.as_pubsub();
+        let mut conn = self.redis_client.get_connection()?;
+        let mut pubsub = conn.as_pubsub();
         pubsub.subscribe(START_PAYMENT_CHANNEL)?;
         loop {
             let msg = pubsub.get_message()?;
