@@ -1,14 +1,18 @@
-use crate::constants::{DEFAULT_PAYMENT_PROCESSOR_HEALTH, FALLBACK_PAYMENT_PROCESSOR_HEALTH};
 use crate::infrastructure;
-use redis::{Commands, TypedCommands};
+use redis::{Commands, RedisError};
+use serde::Deserialize;
 use std::sync::Arc;
+use std::time::Duration;
+use log::debug;
 
+#[derive(Clone, Debug, Deserialize)]
 pub struct HealthCheckConfig {
-    url: String,
-    cache_key_name: String,
-    cache_ttl_seconds: u64,
+    pub url: String,
+    pub cache_key_name: String,
+    pub cache_ttl_seconds: u64,
 }
 
+#[derive(Clone, Debug)]
 pub enum ActiveServer {
     Default,
     Fallback,
@@ -37,49 +41,50 @@ impl HealthChecker {
         }
     }
 
-    pub async fn get_active_server(&mut self) -> infrastructure::Result<ActiveServer> {
+    pub async fn get_active_server(&self) -> infrastructure::Result<ActiveServer> {
         let mut conn = self.redis_client.get_connection()?;
-        let health_default = conn.get(DEFAULT_PAYMENT_PROCESSOR_HEALTH);
+        let health_default: Result<i32, RedisError> =
+            Commands::get(&mut conn, &self.health_check_config_default.cache_key_name);
         if health_default.is_ok() {
             if health_default.unwrap() == 1 {
-                ActiveServer::Default
+                return Ok(ActiveServer::Default);
             }
         }
 
-        let health_fallback = conn.get(FALLBACK_PAYMENT_PROCESSOR_HEALTH);
-
+        let health_fallback: Result<i32, RedisError> =
+            Commands::get(&mut conn, &self.health_check_config_fallback.cache_key_name);
         if health_fallback.is_ok() {
             if health_fallback.unwrap() == 1 {
-                ActiveServer::Fallback
+                return Ok(ActiveServer::Fallback);
             }
         }
 
-        ActiveServer::None
+        Ok(ActiveServer::None)
     }
 
-    pub async fn check_health(&mut self) -> infrastructure::Result<()> {
+    pub async fn check_health(&self) -> infrastructure::Result<()> {
         self.check_payment_processor_health(&self.health_check_config_default)
-            .await;
+            .await?;
         self.check_payment_processor_health(&self.health_check_config_fallback)
-            .await;
+            .await?;
 
         Ok(())
     }
 
     async fn check_payment_processor_health(
-        &mut self,
+        &self,
         config: &HealthCheckConfig,
     ) -> infrastructure::Result<()> {
-        let response = self.http_client.get(&config.url).send().await?;
+        let response = self.http_client.get(&config.url).timeout(Duration::from_millis(4000)).send().await?;
+        debug!("Payment processor health check response: {:?}", response);
         let cache_value = if response.status() == 200 { 1 } else { 0 };
-        let conn = self.redis_client.get_connection()?;
 
-        conn.set_ex(
-            DEFAULT_PAYMENT_PROCESSOR_HEALTH,
+        let mut conn = self.redis_client.get_connection()?;
+        let _: () = conn.set_ex(
+            &config.cache_key_name,
             cache_value,
             config.cache_ttl_seconds,
-        )
-        .await?;
+        )?;
 
         Ok(())
     }

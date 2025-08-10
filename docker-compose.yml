@@ -1,30 +1,30 @@
 services:
-  # PostgreSQL database service
-  postgres:
-    image: postgres:17-alpine
-    container_name: payments-postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: payments
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - backend
-      - payment-processor
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: '512M'
+#  # PostgreSQL database service
+#  postgres:
+#    image: postgres:17-alpine
+#    container_name: payments-postgres
+#    environment:
+#      POSTGRES_USER: postgres
+#      POSTGRES_PASSWORD: postgres
+#      POSTGRES_DB: payments
+#    ports:
+#      - "5432:5432"
+#    volumes:
+#      - postgres-data:/var/lib/postgresql/data
+#      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+#    healthcheck:
+#      test: ["CMD-SHELL", "pg_isready -U postgres"]
+#      interval: 5s
+#      timeout: 5s
+#      retries: 5
+#    networks:
+#      - backend
+#      - payment-processor
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.5'
+#          memory: '512M'
 
   redis:
     image: redis:8.0-alpine

@@ -1,11 +1,13 @@
 use crate::application::domain::payment::Payment;
+use crate::constants::PAYMENTS_KEY;
 use crate::infrastructure;
+use crate::infrastructure::Error;
 use crate::presentation::data::PaymentResponse;
-use chrono::Timelike;
+use crate::presentation::health_checker::{ActiveServer, HealthChecker};
+use log::debug;
 use redis::{Client, Commands};
 use reqwest::Response;
 use std::sync::Arc;
-use crate::constants::PAYMENTS_KEY;
 
 #[derive(Clone)]
 pub struct UsecaseConfig {
@@ -18,6 +20,7 @@ pub struct CreatePaymentUsecase {
     config: UsecaseConfig,
     redis_client: Arc<Client>,
     http_client: Arc<reqwest::Client>,
+    health_checker: Arc<HealthChecker>,
 }
 
 impl CreatePaymentUsecase {
@@ -25,54 +28,44 @@ impl CreatePaymentUsecase {
         config: UsecaseConfig,
         redis_client: Arc<Client>,
         http_client: Arc<reqwest::Client>,
+        health_checker: Arc<HealthChecker>,
     ) -> Self {
         CreatePaymentUsecase {
             config,
             redis_client,
             http_client,
+            health_checker,
         }
     }
 
     pub async fn execute<'a>(
-        &mut self,
+        &self,
         payment: &'a Payment,
     ) -> infrastructure::Result<&'a Payment> {
         let payment_request = PaymentResponse::from(payment);
-
-        let mut response: Response;
-        response = self
+        let active_server: ActiveServer = self.health_checker.get_active_server().await?;
+        debug!("Active server: {:?}", &active_server);
+        let url_payment_processor: &String = match active_server {
+            ActiveServer::Default => Ok(&self.config.payment_processor_default_url),
+            ActiveServer::Fallback => Ok(&self.config.payment_processor_fallback_url),
+            ActiveServer::None => Err(Error::from("Payment server is not available.")),
+        }?;
+        let response: Response = self
             .http_client
-            .post(format!(
-                "{}/payments",
-                &self.config.payment_processor_default_url
-            ))
+            .post(format!("{}/payments", url_payment_processor))
             .json(&payment_request)
             .send()
             .await?;
-
-        if response.status() != 200 {
-            response = self
-                .http_client
-                .post(format!(
-                    "{}/payments",
-                    &self.config.payment_processor_fallback_url
-                ))
-                .json(&payment_request)
-                .send()
-                .await?;
-        }
+        debug!("Payment processor response: {:?}", response);
 
         if response.status() == 200 {
             let timestamp = payment.requested_at.timestamp_nanos_opt().unwrap();
             let payment_json = serde_json::to_string(&payment)?;
             let mut conn = self.redis_client.get_connection()?;
-            let result_zadd: bool = conn.zadd(
-                PAYMENTS_KEY,
-                payment_json,
-                timestamp,
-            )?;
+            let _: bool = conn.zadd(PAYMENTS_KEY, payment_json, timestamp)?;
+        } else {
+            Err(Error::from("Payment processor error."))?
         }
-
         Ok(payment)
     }
 }

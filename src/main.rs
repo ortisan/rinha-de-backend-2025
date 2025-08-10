@@ -1,17 +1,21 @@
 use crate::application::usecases::accept_payment::AcceptPaymentUsecase;
 use crate::application::usecases::create_payment::{CreatePaymentUsecase, UsecaseConfig};
 use crate::application::usecases::get_payments_summary::GetPaymentsSummaryUsecase;
-use crate::infrastructure::postgres::{DbConfig, PostgresPaymentRepository};
+use crate::constants::{DEFAULT_PAYMENT_PROCESSOR_HEALTH, FALLBACK_PAYMENT_PROCESSOR_HEALTH};
 use crate::infrastructure::redis::RedisConfig;
+use crate::presentation::health_checker::{HealthCheckConfig, HealthChecker};
 use crate::presentation::payment_routes;
 use crate::presentation::worker::Worker;
 use actix_web::middleware::Logger;
-use actix_web::{App, HttpServer, web};
+use actix_web::{web, App, HttpServer};
 use env_logger;
+use log::{debug, error};
 use redis::Client;
 use reqwest;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio;
+use tokio::time::interval;
 
 mod application;
 mod constants;
@@ -21,13 +25,11 @@ mod presentation;
 #[actix_web::main]
 async fn main() -> infrastructure::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("debug"));
-    let database_uri = dotenv::var("DATABASE_URI").expect("DATABASE_URI not found");
-    let db_config = DbConfig {
-        database_url: database_uri,
-    };
+
     let redis_uri = dotenv::var("REDIS_URI").expect("REDIS_URI not found");
     let redis_config = RedisConfig { uri: redis_uri };
     let redis_client = Arc::new(Client::open(redis_config.uri)?);
+
     let accept_payment_usecase = AcceptPaymentUsecase::new(redis_client.clone());
     let app_data_accept_payment_usecase = web::Data::new(accept_payment_usecase);
 
@@ -45,15 +47,54 @@ async fn main() -> infrastructure::Result<()> {
     let app_data_get_summary_usecase = web::Data::new(get_summary_usecase);
 
     let http_client = Arc::new(reqwest::Client::new());
-    let create_payment_usecase =
-        CreatePaymentUsecase::new(create_payment_config, redis_client.clone(), http_client.clone());
+
+    let health_config_default_url = dotenv::var("HEALTH_CHECKER_DEFAULT_URL")?;
+    let health_config_fallback_url = dotenv::var("HEALTH_CHECKER_FALBACK_URL")?;
+    let health_check_default_config = HealthCheckConfig {
+        url: health_config_default_url,
+        cache_key_name: String::from(DEFAULT_PAYMENT_PROCESSOR_HEALTH),
+        cache_ttl_seconds: 5,
+    };
+    let health_check_fallback_config = HealthCheckConfig {
+        url: health_config_fallback_url,
+        cache_key_name: String::from(FALLBACK_PAYMENT_PROCESSOR_HEALTH),
+        cache_ttl_seconds: 5,
+    };
+    let health_checker = Arc::new(HealthChecker::new(
+        redis_client.clone(),
+        http_client.clone(),
+        health_check_default_config.clone(),
+        health_check_fallback_config.clone(),
+    ));
+
+    let create_payment_usecase = Arc::new(CreatePaymentUsecase::new(
+        create_payment_config,
+        redis_client.clone(),
+        http_client.clone(),
+        health_checker.clone(),
+    ));
 
     tokio::spawn(async move {
-        let mut worker = Worker::new(redis_client.clone(), create_payment_usecase);
-        worker
-            .listen_for_payments()
-            .await
-            .expect("Error to listen for payments");
+        let mut interval = interval(Duration::from_millis(4500));
+        loop {
+            debug!("Health check started");
+            // Wait for the next tick of the interval.
+            // interval.tick().await;
+            let health_result = &health_checker.check_health().await;
+            match health_result {
+                Ok(_) => debug!("Health check finished"),
+                Err(e) => error!("Health check error: {:?}", e),
+            }
+        }
+    });
+
+    let redis_client_listener_payment = redis_client.clone();
+    tokio::spawn(async move {
+        let worker = Worker::new(redis_client_listener_payment, create_payment_usecase);
+        match worker.listen_for_payments().await {
+            Ok(_) => debug!("Worker finished"),
+            Err(e) => error!("Worker error: {:?}", e),
+        }
     });
 
     HttpServer::new(move || {
