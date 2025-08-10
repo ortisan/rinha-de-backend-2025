@@ -38,18 +38,24 @@ impl CreatePaymentUsecase {
         }
     }
 
-    pub async fn execute<'a>(
-        &self,
-        payment: &'a Payment,
-    ) -> infrastructure::Result<&'a Payment> {
-        let payment_request = PaymentResponse::from(payment);
+    pub async fn execute<'a>(&self, payment: &'a Payment) -> infrastructure::Result<&'a Payment> {
         let active_server: ActiveServer = self.health_checker.get_active_server().await?;
         debug!("Active server: {:?}", &active_server);
         let url_payment_processor: &String = match active_server {
-            ActiveServer::Default => Ok(&self.config.payment_processor_default_url),
-            ActiveServer::Fallback => Ok(&self.config.payment_processor_fallback_url),
-            ActiveServer::None => Err(Error::from("Payment server is not available.")),
+            ActiveServer::Default => {
+                debug!("Using default payment processor.");
+                Ok(&self.config.payment_processor_default_url)
+            }
+            ActiveServer::Fallback => {
+                debug!("Using fallback payment processor.");
+                Ok(&self.config.payment_processor_fallback_url)
+            }
+            ActiveServer::None => {
+                debug!("Payment server is not available.");
+                Err(Error::from("Payment server is not available."))
+            }
         }?;
+        let payment_request = PaymentResponse::from(payment);
         let response: Response = self
             .http_client
             .post(format!("{}/payments", url_payment_processor))

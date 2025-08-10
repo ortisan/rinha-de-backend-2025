@@ -73,7 +73,7 @@ async fn main() -> infrastructure::Result<()> {
         tokio::spawn(async move {
             loop {
                 debug!("Waiting for the next tick of the interval");
-                tokio::time::sleep(Duration::from_millis(1000)).await;
+                tokio::time::sleep(Duration::from_millis(4000)).await;
                 debug!("Health check started");
                 let health_result = &health_checker_clone.check_health().await;
                 match health_result {

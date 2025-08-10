@@ -1,9 +1,9 @@
 use crate::infrastructure;
+use log::debug;
 use redis::{Commands, RedisError};
 use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
-use log::debug;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct HealthCheckConfig {
@@ -75,7 +75,12 @@ impl HealthChecker {
         &self,
         config: &HealthCheckConfig,
     ) -> infrastructure::Result<()> {
-        let response = self.http_client.get(&config.url).timeout(Duration::from_millis(4000)).send().await?;
+        let response = self
+            .http_client
+            .get(&config.url)
+            .timeout(Duration::from_millis(5000))
+            .send()
+            .await?;
         debug!("Payment processor health check response: {:?}", response);
         let cache_value = if response.status() == 200 { 1 } else { 0 };
 

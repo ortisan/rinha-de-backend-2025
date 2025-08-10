@@ -6,7 +6,7 @@ use crate::presentation::data::{
 };
 use actix_web::{get, post, web, HttpResponse};
 
-#[post("/payments")]
+#[post("/payments{tail:/*}")]
 pub async fn create_payment(
     accept_payment_usecase: web::Data<AcceptPaymentUsecase>,
     payment_data: web::Json<PaymentRequest>,
@@ -24,7 +24,7 @@ pub async fn create_payment(
     }
 }
 
-#[get("/payments-summary")]
+#[get("/payments-summary{tail:/*}")]
 pub async fn get_payments_payments_summary(
     get_payments_summary_usecase: web::Data<GetPaymentsSummaryUsecase>,
     filter: web::Query<GetPaymentsSummaryFilter>,
