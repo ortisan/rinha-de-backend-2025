@@ -7,7 +7,7 @@ use crate::presentation::health_checker::{HealthCheckConfig, HealthChecker};
 use crate::presentation::payment_routes;
 use crate::presentation::worker::Worker;
 use actix_web::middleware::Logger;
-use actix_web::{web, App, HttpServer};
+use actix_web::{App, HttpServer, web};
 use env_logger;
 use log::{debug, error};
 use redis::Client;
@@ -22,7 +22,7 @@ mod constants;
 mod infrastructure;
 mod presentation;
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> infrastructure::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("debug"));
 
@@ -60,6 +60,7 @@ async fn main() -> infrastructure::Result<()> {
         cache_key_name: String::from(FALLBACK_PAYMENT_PROCESSOR_HEALTH),
         cache_ttl_seconds: 5,
     };
+
     let health_checker = Arc::new(HealthChecker::new(
         redis_client.clone(),
         http_client.clone(),
@@ -67,35 +68,38 @@ async fn main() -> infrastructure::Result<()> {
         health_check_fallback_config.clone(),
     ));
 
-    let create_payment_usecase = Arc::new(CreatePaymentUsecase::new(
-        create_payment_config,
-        redis_client.clone(),
-        http_client.clone(),
-        health_checker.clone(),
-    ));
-
-    tokio::spawn(async move {
-        let mut interval = interval(Duration::from_millis(4500));
-        loop {
-            debug!("Health check started");
-            // Wait for the next tick of the interval.
-            // interval.tick().await;
-            let health_result = &health_checker.check_health().await;
-            match health_result {
-                Ok(_) => debug!("Health check finished"),
-                Err(e) => error!("Health check error: {:?}", e),
+    {
+        let health_checker_clone = health_checker.clone();
+        tokio::spawn(async move {
+            loop {
+                debug!("Waiting for the next tick of the interval");
+                tokio::time::sleep(Duration::from_millis(1000)).await;
+                debug!("Health check started");
+                let health_result = &health_checker_clone.check_health().await;
+                match health_result {
+                    Ok(_) => debug!("Health check finished"),
+                    Err(e) => error!("Health check error: {:?}", e),
+                }
             }
-        }
-    });
+        });
+    }
 
-    let redis_client_listener_payment = redis_client.clone();
-    tokio::spawn(async move {
-        let worker = Worker::new(redis_client_listener_payment, create_payment_usecase);
-        match worker.listen_for_payments().await {
-            Ok(_) => debug!("Worker finished"),
-            Err(e) => error!("Worker error: {:?}", e),
-        }
-    });
+    {
+        let create_payment_usecase = Arc::new(CreatePaymentUsecase::new(
+            create_payment_config,
+            redis_client.clone(),
+            http_client.clone(),
+            health_checker.clone(),
+        ));
+        let redis_client_listener_payment = redis_client.clone();
+        tokio::spawn(async move {
+            let worker = Worker::new(redis_client_listener_payment, create_payment_usecase);
+            match worker.listen_for_payments().await {
+                Ok(_) => debug!("Worker finished"),
+                Err(e) => error!("Worker error: {:?}", e),
+            }
+        });
+    }
 
     HttpServer::new(move || {
         App::new()
