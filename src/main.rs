@@ -2,7 +2,7 @@ use crate::application::usecases::accept_payment::AcceptPaymentUsecase;
 use crate::application::usecases::create_payment::{CreatePaymentUsecase, UsecaseConfig};
 use crate::application::usecases::get_payments_summary::GetPaymentsSummaryUsecase;
 use crate::constants::{DEFAULT_PAYMENT_PROCESSOR_HEALTH, FALLBACK_PAYMENT_PROCESSOR_HEALTH};
-use crate::infrastructure::redis::RedisConfig;
+use crate::infrastructure::redis::{RedisConfig, RedisPaymentRepository};
 use crate::presentation::health_checker::{HealthCheckConfig, HealthChecker};
 use crate::presentation::payment_routes;
 use crate::presentation::worker::Worker;
@@ -28,9 +28,9 @@ async fn main() -> infrastructure::Result<()> {
 
     let redis_uri = dotenv::var("REDIS_URI").expect("REDIS_URI not found");
     let redis_config = RedisConfig { uri: redis_uri };
-    let redis_client = Arc::new(Client::open(redis_config.uri)?);
+    let redis_repository = RedisPaymentRepository::new(redis_config);
 
-    let accept_payment_usecase = AcceptPaymentUsecase::new(redis_client.clone());
+    let accept_payment_usecase = AcceptPaymentUsecase::new(redis_repository.clone());
     let app_data_accept_payment_usecase = web::Data::new(accept_payment_usecase);
 
     let payment_processor_default_url = dotenv::var("PAYMENT_PROCESSOR_DEFAULT_URL")

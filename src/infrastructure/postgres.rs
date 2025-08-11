@@ -40,7 +40,7 @@ impl PostgresPaymentRepository {
 }
 
 #[async_trait]
-impl PaymentRepository for Arc<PostgresPaymentRepository> {
+impl PaymentRepository for PostgresPaymentRepository {
     async fn create(&self, payment: Payment) -> Result<Payment, Error> {
         let payment_model = PaymentModel::from(payment.clone());
 

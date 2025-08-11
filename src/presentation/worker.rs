@@ -1,6 +1,6 @@
 use crate::application::domain::payment::Payment;
 use crate::application::usecases::create_payment::CreatePaymentUsecase;
-use crate::constants::START_PAYMENT_CHANNEL;
+use crate::constants::ACCEPTED_PAYMENT_CHANNEL;
 use crate::infrastructure;
 use crate::infrastructure::Error;
 use crate::presentation::data::PaymentsSummaryResponse;
@@ -28,7 +28,7 @@ impl Worker {
     pub async fn listen_for_payments(&self) -> infrastructure::Result<()> {
         let mut conn = self.redis_client.get_connection()?;
         let mut pub_sub = conn.as_pubsub();
-        pub_sub.subscribe(START_PAYMENT_CHANNEL)?;
+        pub_sub.subscribe(ACCEPTED_PAYMENT_CHANNEL)?;
         loop {
             let msg = pub_sub.get_message();
             if msg.is_err() {

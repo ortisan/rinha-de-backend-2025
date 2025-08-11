@@ -25,6 +25,25 @@ services:
 #        limits:
 #          cpus: '0.5'
 #          memory: '512M'
+#  dragonfly:
+#    image: docker.dragonflydb.io/dragonflydb/dragonfly
+#    ulimits:
+#      memlock: -1
+#    container_name: rinha-dragonfly
+#    ports:
+#      - "6379:6379"
+#    networks:
+#      - backend
+#    healthcheck:
+#      test: [ "CMD", "redis-cli", "ping" ]
+#      interval: 5s
+#      timeout: 5s
+#      retries: 5
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: "0.25"
+#          memory: "275MB"
 
   redis:
     image: redis:8.0-alpine

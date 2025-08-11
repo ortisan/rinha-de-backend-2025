@@ -57,7 +57,7 @@ export default function () {
 
     // Check if the request was successful
     check(response, {
-        'status is 200': (r) => 202 >= r.status,
+        'status is 200': (r) => r.status === 200,
     });
 
     // Add a small sleep to prevent overwhelming the server
