@@ -1,3 +1,4 @@
+use crate::infrastructure;
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -10,9 +11,21 @@ pub enum HttpMethod {
     OPTIONS,
 }
 
-pub enum HeaderValue {
-    One(String),
-    Many(Vec<String>),
+pub struct HeaderValue(String);
+impl HeaderValue {
+    pub fn new(value: String) -> Self {
+        Self(value)
+    }
+
+     pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn into_string(self) -> String {
+        self.0
+    }
+
+
 }
 
 pub type Headers = HashMap<String, HeaderValue>;
@@ -20,6 +33,12 @@ pub type Params = HashMap<String, String>;
 
 pub struct Status {
     code: u16,
+}
+
+impl Status {
+    pub fn new(code: u16) -> Self {
+        Self { code }
+    }
 }
 
 impl Status {
@@ -52,5 +71,8 @@ pub struct HttpResponse<Deserialize> {
 }
 
 pub trait HttpRequester {
-    async fn make_request<T, O>(&self, req: HttpRequest<T>) -> HttpResponse<O>;
+    async fn make_request<T, O>(
+        &self,
+        req: HttpRequest<T>,
+    ) -> infrastructure::Result<HttpResponse<O>>;
 }

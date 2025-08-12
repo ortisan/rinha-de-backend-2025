@@ -7,28 +7,46 @@ use crate::infrastructure;
 use chrono::{DateTime, Utc};
 use log::{debug, error};
 use redis::TypedCommands;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct RedisConfig {
     pub uri: String,
 }
 
-pub struct RedisPaymentRepository {
+pub struct RedisRepository {
     redis_client: redis::Client,
 }
 
-impl RedisPaymentRepository {
+impl RedisRepository {
     pub fn new(config: RedisConfig) -> Self {
-        RedisPaymentRepository {
+        RedisRepository {
             redis_client: redis::Client::open(config.uri).unwrap(),
         }
+    }
+
+    pub fn set_with_expiration<T>(
+        &self,
+        key: String,
+        value: T,
+        ttl: Duration,
+    ) -> infrastructure::Result<()>
+    where
+        T: Serialize + DeserializeOwned + Send + Sync,
+    {
+        let mut conn = self.redis_client.get_connection()?;
+        let value = serde_json::to_string(&value)?;
+        let _ = conn.set_ex(&key, value, ttl.as_secs());
+        Ok(())
     }
 }
 
 #[async_trait::async_trait]
-impl PaymentRepository for RedisPaymentRepository {
+impl PaymentRepository for RedisRepository {
     async fn create(&self, payment: &Payment) -> infrastructure::Result<Payment> {
         debug!("Creating payment: {:?}", payment);
         let timestamp = payment.requested_at.timestamp_nanos_opt().unwrap();
@@ -52,7 +70,6 @@ impl PaymentRepository for RedisPaymentRepository {
 
         let mut conn = self.redis_client.get_connection()?;
         let payments: Vec<String> = conn.zrangebyscore(PAYMENTS_KEY, min_key, max_key)?;
-
         let mut total_payments: u64 = 0;
         let mut total_amount: f64 = 0.0;
 
@@ -70,7 +87,7 @@ impl PaymentRepository for RedisPaymentRepository {
 }
 
 #[async_trait::async_trait]
-impl Publisher for RedisPaymentRepository {
+impl Publisher for RedisRepository {
     async fn publish_accepted_payment(&self, payment: &Payment) -> infrastructure::Result<()> {
         let user_json = serde_json::to_string(payment)?;
         let mut conn = self.redis_client.get_connection()?;
@@ -80,7 +97,7 @@ impl Publisher for RedisPaymentRepository {
 }
 
 #[async_trait::async_trait]
-impl Consumer for RedisPaymentRepository {
+impl Consumer for RedisRepository {
     async fn listen_for_accepted_payment<F, Fut>(&self, mut f: F) -> infrastructure::Result<()>
     where
         F: FnMut(Arc<Payment>) -> Fut + Send + 'static,

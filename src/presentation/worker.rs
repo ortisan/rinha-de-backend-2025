@@ -8,6 +8,7 @@ use actix_web::HttpResponse;
 use log::{debug, error};
 use redis::Client;
 use std::sync::Arc;
+use crate::application::usecases::usecase::Usecase;
 
 pub struct Worker {
     pub redis_client: Arc<Client>,

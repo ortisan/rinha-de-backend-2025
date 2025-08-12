@@ -17,7 +17,7 @@ pub async fn create_payment(
     let acccept_payment_result = usecase.execute(payment).await;
     match acccept_payment_result {
         Ok(payment) => {
-            let payment_response = PaymentResponse::from(payment);
+            let payment_response = PaymentResponse::from(&payment);
             HttpResponse::Accepted().json(payment_response)
         }
         Err(error) => HttpResponse::BadRequest().body(error.to_string()),

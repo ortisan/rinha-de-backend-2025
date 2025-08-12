@@ -2,7 +2,7 @@ use crate::application::usecases::accept_payment::AcceptPaymentUsecase;
 use crate::application::usecases::create_payment::{CreatePaymentUsecase, UsecaseConfig};
 use crate::application::usecases::get_payments_summary::GetPaymentsSummaryUsecase;
 use crate::constants::{DEFAULT_PAYMENT_PROCESSOR_HEALTH, FALLBACK_PAYMENT_PROCESSOR_HEALTH};
-use crate::infrastructure::redis::{RedisConfig, RedisPaymentRepository};
+use crate::infrastructure::redis::{RedisConfig, RedisRepository};
 use crate::presentation::health_checker::{HealthCheckConfig, HealthChecker};
 use crate::presentation::payment_routes;
 use crate::presentation::worker::Worker;
@@ -28,7 +28,7 @@ async fn main() -> infrastructure::Result<()> {
 
     let redis_uri = dotenv::var("REDIS_URI").expect("REDIS_URI not found");
     let redis_config = RedisConfig { uri: redis_uri };
-    let redis_repository = RedisPaymentRepository::new(redis_config);
+    let redis_repository = Arc::new(RedisRepository::new(redis_config));
 
     let accept_payment_usecase = AcceptPaymentUsecase::new(redis_repository.clone());
     let app_data_accept_payment_usecase = web::Data::new(accept_payment_usecase);
@@ -43,7 +43,7 @@ async fn main() -> infrastructure::Result<()> {
     };
 
     // let payment_repository = Arc::new(PostgresPaymentRepository::new(db_config));
-    let get_summary_usecase = GetPaymentsSummaryUsecase::new(redis_client.clone());
+    let get_summary_usecase = GetPaymentsSummaryUsecase::new(redis_repository.clone());
     let app_data_get_summary_usecase = web::Data::new(get_summary_usecase);
 
     let http_client = Arc::new(reqwest::Client::new());
@@ -61,8 +61,9 @@ async fn main() -> infrastructure::Result<()> {
         cache_ttl_seconds: 5,
     };
 
+    let payment_repository = Arc::new(RedisRepository::new(redis_config));
+    let redis_client = Client::open(redis_uri)?;
     let health_checker = Arc::new(HealthChecker::new(
-        redis_client.clone(),
         http_client.clone(),
         health_check_default_config.clone(),
         health_check_fallback_config.clone(),
@@ -87,7 +88,7 @@ async fn main() -> infrastructure::Result<()> {
     {
         let create_payment_usecase = Arc::new(CreatePaymentUsecase::new(
             create_payment_config,
-            redis_client.clone(),
+            payment_repository.clone(),
             http_client.clone(),
             health_checker.clone(),
         ));

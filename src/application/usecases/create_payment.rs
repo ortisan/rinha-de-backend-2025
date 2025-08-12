@@ -17,7 +17,7 @@ pub struct UsecaseConfig {
 
 pub struct CreatePaymentUsecase {
     config: UsecaseConfig,
-    payment_repository: Box<dyn PaymentRepository>,
+    payment_repository: Arc<dyn PaymentRepository>,
     http_client: Arc<reqwest::Client>,
     health_checker: Arc<HealthChecker>,
 }
@@ -25,7 +25,7 @@ pub struct CreatePaymentUsecase {
 impl CreatePaymentUsecase {
     pub fn new(
         config: UsecaseConfig,
-        payment_repository: Box<dyn PaymentRepository>,
+        payment_repository: Arc<dyn PaymentRepository>,
         http_client: Arc<reqwest::Client>,
         health_checker: Arc<HealthChecker>,
     ) -> Self {
