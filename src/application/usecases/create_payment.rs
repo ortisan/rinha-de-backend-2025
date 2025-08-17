@@ -84,6 +84,8 @@ impl UseCase<Payment, Payment> for CreatePaymentUseCase {
         } else {
             Err(Error::from("Payment processor error."))?
         }
+        
+        
         // debug!("Creating payment: {:?}", payment);
         // let active_server: ActiveServer = self.health_checker.get_active_server().await?;
         // debug!("Active server: {:?}", &active_server);

@@ -2,6 +2,7 @@ use crate::application::http::http::{
     HeaderValue, Headers, HttpMethod, HttpRequest, HttpRequester, HttpResponse, Status,
 };
 use crate::infrastructure;
+use crate::infrastructure::utils::is_unit_type;
 use reqwest::{Client, Method, StatusCode};
 use std::convert::From;
 use std::sync::Arc;
@@ -35,6 +36,9 @@ impl HttpRequester for HttpReqwest {
                 });
             }
         }
+        if req.body.is_some() {
+            request_builder = request_builder.json(&req.body.unwrap());
+        }
         if (req.timeout).is_some() {
             request_builder = request_builder.timeout(req.timeout.unwrap());
         }
@@ -46,6 +50,9 @@ impl HttpRequester for HttpReqwest {
             .map(|h| (h.0.to_string(), HeaderValue::from(h.1.clone())))
             .collect();
         let status = Status::from(response.status());
+        if is_unit_type::<O>() {
+            return Ok(HttpResponse::new(status, headers, None));
+        }
         let body: O = response.json().await?;
         Ok(HttpResponse::new(status, headers, Some(body)))
     }
@@ -75,8 +82,6 @@ impl From<reqwest::header::HeaderValue> for HeaderValue {
         HeaderValue::new(String::from(value.to_str().unwrap()))
     }
 }
-
-
 
 // impl<B: serde::de::DeserializeOwned> From<&Response> for HttpResponse<B> {
 //     fn from(response: &Response) -> Self {

@@ -6,13 +6,15 @@ use crate::application::repositories::payment_repository::PaymentRepository;
 use crate::constants::{ACCEPTED_PAYMENT_CHANNEL, PAYMENTS_KEY};
 use crate::infrastructure;
 use chrono::{DateTime, Utc};
+use diesel::r2d2;
 use log::{debug, error};
-use redis::{Commands, FromRedisValue, RedisResult, ToRedisArgs, Value};
-use serde::de::DeserializeOwned;
+use redis::{Client, Commands, FromRedisValue, RedisResult, ToRedisArgs, Value};
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
+use diesel::r2d2::{Pool, PooledConnection};
 
 #[derive(Debug, Clone)]
 pub struct RedisConfig {
@@ -20,14 +22,25 @@ pub struct RedisConfig {
 }
 
 pub struct RedisRepository {
-    redis_client: Arc<redis::Client>,
+    redis_pool: Arc<Pool<Client>>,
 }
 
 impl RedisRepository {
     pub fn new(config: RedisConfig) -> Self {
+        let client = redis::Client::open(config.uri).unwrap();
+        let pool = r2d2::Pool::builder().build(client).unwrap();
+
         RedisRepository {
-            redis_client: Arc::new(redis::Client::open(config.uri).unwrap()),
+            redis_pool: Arc::new(pool),
         }
+    }
+
+    pub fn get_pool(&self) -> Arc<Pool<Client>> {
+        self.redis_pool.clone()
+    }
+
+    pub fn get_connection(&self) -> PooledConnection<Client> {
+        self.redis_pool.get().unwrap()
     }
 }
 
@@ -42,7 +55,7 @@ impl CacheRepository for RedisRepository {
     where
         T: Serialize + Send + Sync + Sized + 'static,
     {
-        let mut conn = self.redis_client.get_connection()?;
+        let mut conn = self.get_connection();
         let value = serde_json::to_string(&value)?;
         let _: () = conn.set_ex(&key, value, ttl.as_secs())?;
         Ok(())
@@ -52,7 +65,7 @@ impl CacheRepository for RedisRepository {
     where
         T: DeserializeOwned + Sized + 'static,
     {
-        let mut conn = self.redis_client.get_connection()?;
+        let mut conn = self.get_connection();
         let redis_value: Option<String> = conn.get(&key)?;
 
         match redis_value {
@@ -69,9 +82,8 @@ impl CacheRepository for RedisRepository {
 impl PaymentRepository for RedisRepository {
     async fn create(&self, payment: &Payment) -> infrastructure::Result<Payment> {
         debug!("Creating payment: {:?}", payment);
-        let timestamp = payment.requested_at.timestamp_nanos_opt().unwrap();
-        let payment_json = serde_json::to_string(&payment)?;
-        let mut conn = self.redis_client.get_connection()?;
+        let timestamp = payment.requested_at.timestamp_millis();
+        let mut conn = self.get_connection();
         let payment_as_string = serde_json::to_string(&payment).unwrap();
         let _: () = conn.zadd(String::from(PAYMENTS_KEY), &payment_as_string, timestamp)?;
         Ok(payment.clone())
@@ -82,14 +94,14 @@ impl PaymentRepository for RedisRepository {
         from: DateTime<Utc>,
         to: DateTime<Utc>,
     ) -> infrastructure::Result<PaymentsSummary> {
-        let min_key = from.timestamp_nanos_opt().unwrap();
-        let max_key = to.timestamp_nanos_opt().unwrap();
+        let min_key = from.timestamp_millis();
+        let max_key = to.timestamp_millis();
         debug!(
             "Getting payments summary. To: {}, From: {}",
             min_key, max_key
         );
 
-        let mut conn = self.redis_client.get_connection()?;
+        let mut conn = self.get_connection();
         let payments: Vec<String> = conn.zrangebyscore(PAYMENTS_KEY, min_key, max_key)?;
         let mut total_payments: u64 = 0;
         let mut total_amount: f64 = 0.0;
@@ -111,7 +123,7 @@ impl PaymentRepository for RedisRepository {
 impl Publisher for RedisRepository {
     async fn publish_accepted_payment(&self, payment: &Payment) -> infrastructure::Result<()> {
         let user_json = serde_json::to_string(payment)?;
-        let mut conn = self.redis_client.get_connection()?;
+        let mut conn = self.get_connection();
         let _: usize = conn.publish(ACCEPTED_PAYMENT_CHANNEL, user_json)?;
         Ok(())
     }
@@ -124,7 +136,7 @@ impl Consumer for RedisRepository {
         F: FnMut(Arc<Payment>) -> Fut + Send + 'static,
         Fut: Future<Output = infrastructure::Result<()>> + Send + 'static,
     {
-        let mut conn = self.redis_client.get_connection()?;
+        let mut conn = self.get_connection();
         let mut pub_sub = conn.as_pubsub();
         pub_sub.subscribe(ACCEPTED_PAYMENT_CHANNEL)?;
         loop {

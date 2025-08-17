@@ -6,6 +6,7 @@ use crate::presentation::data::{
     GetPaymentsSummaryFilter, PaymentRequest, PaymentResponse, PaymentsSummaryResponse,
 };
 use actix_web::{HttpResponse, get, post, web};
+use log::error;
 
 #[post("/payments{tail:/*}")]
 pub async fn create_payment(
@@ -17,7 +18,7 @@ pub async fn create_payment(
     match acccept_payment_result {
         Ok(payment) => {
             let payment_response = PaymentResponse::from(&payment);
-            HttpResponse::Accepted().json(payment_response)
+            HttpResponse::Ok().json(payment_response)
         }
         Err(error) => HttpResponse::BadRequest().body(error.to_string()),
     }
@@ -36,6 +37,9 @@ pub async fn get_payments_payments_summary(
             let summary_response = PaymentsSummaryResponse::from(summary);
             HttpResponse::Ok().json(summary_response)
         }
-        Err(error) => HttpResponse::BadRequest().body(error.to_string()),
+        Err(error) => {
+            error!("Error: {}", error);
+            HttpResponse::BadRequest().body(error.to_string())
+        },
     }
 }

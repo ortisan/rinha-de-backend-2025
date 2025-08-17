@@ -55,13 +55,13 @@ async fn main() -> infrastructure::Result<()> {
         url: health_config_default_url,
         method: HttpMethod::GET,
         cache_key_name: String::from(DEFAULT_PAYMENT_PROCESSOR_HEALTH),
-        cache_ttl_seconds: 5,
+        cache_ttl_seconds: 999,
     };
     let health_check_fallback_config = HealthCheckConfig {
         url: health_config_fallback_url,
         method: HttpMethod::GET,
         cache_key_name: String::from(FALLBACK_PAYMENT_PROCESSOR_HEALTH),
-        cache_ttl_seconds: 5,
+        cache_ttl_seconds: 999,
     };
 
     let health_checker = Arc::new(HealthChecker::new(

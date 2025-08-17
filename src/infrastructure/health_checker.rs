@@ -92,7 +92,7 @@ impl HealthChecker {
     ) -> infrastructure::Result<()> {
         // TODO change to fluent builder
         let request: HttpRequest<()> = HttpRequest::new(
-            HttpMethod::GET,
+            config.method.clone(),
             config.url.clone(),
             None,
             None,
@@ -102,13 +102,15 @@ impl HealthChecker {
         let response: HttpResponse<HealthCheckResponse> =
             self.http_requester.make_request(request).await?;
 
-        self.cache_repository
+        if response.status.is_success() {
+            self.cache_repository
             .set_with_expiration(
                 config.cache_key_name.clone(),
                 response.body,
                 Duration::from_secs(config.cache_ttl_seconds),
             )
             .await?;
+        }
         Ok(())
     }
 }

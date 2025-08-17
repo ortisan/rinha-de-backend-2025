@@ -46,6 +46,7 @@ impl Worker {
                 },
             )
             .await?;
+
         Ok(())
 
         // let mut conn = self.cache_repository.get_connection()?;
