@@ -1,14 +1,15 @@
 use crate::application::domain::payment::{Payment, PaymentsSummary};
 use crate::application::messaging::consumer::Consumer;
 use crate::application::messaging::publisher::Publisher;
+use crate::application::repositories::cache_repository::CacheRepository;
 use crate::application::repositories::payment_repository::PaymentRepository;
 use crate::constants::{ACCEPTED_PAYMENT_CHANNEL, PAYMENTS_KEY};
 use crate::infrastructure;
 use chrono::{DateTime, Utc};
 use log::{debug, error};
-use redis::TypedCommands;
+use redis::{Commands, FromRedisValue, RedisResult, ToRedisArgs, Value};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,29 +20,48 @@ pub struct RedisConfig {
 }
 
 pub struct RedisRepository {
-    redis_client: redis::Client,
+    redis_client: Arc<redis::Client>,
 }
 
 impl RedisRepository {
     pub fn new(config: RedisConfig) -> Self {
         RedisRepository {
-            redis_client: redis::Client::open(config.uri).unwrap(),
+            redis_client: Arc::new(redis::Client::open(config.uri).unwrap()),
         }
     }
+}
 
-    pub fn set_with_expiration<T>(
+#[async_trait::async_trait]
+impl CacheRepository for RedisRepository {
+    async fn set_with_expiration<T>(
         &self,
         key: String,
         value: T,
         ttl: Duration,
     ) -> infrastructure::Result<()>
     where
-        T: Serialize + DeserializeOwned + Send + Sync,
+        T: Serialize + Send + Sync + Sized + 'static,
     {
         let mut conn = self.redis_client.get_connection()?;
         let value = serde_json::to_string(&value)?;
-        let _ = conn.set_ex(&key, value, ttl.as_secs());
+        let _: () = conn.set_ex(&key, value, ttl.as_secs())?;
         Ok(())
+    }
+
+    async fn get<T>(&self, key: String) -> infrastructure::Result<Option<T>>
+    where
+        T: DeserializeOwned + Sized + 'static,
+    {
+        let mut conn = self.redis_client.get_connection()?;
+        let redis_value: Option<String> = conn.get(&key)?;
+
+        match redis_value {
+            Some(json_string) => {
+                let value: T = serde_json::from_str(&json_string)?;
+                Ok(Some(value))
+            }
+            None => Ok(None),
+        }
     }
 }
 
@@ -52,7 +72,8 @@ impl PaymentRepository for RedisRepository {
         let timestamp = payment.requested_at.timestamp_nanos_opt().unwrap();
         let payment_json = serde_json::to_string(&payment)?;
         let mut conn = self.redis_client.get_connection()?;
-        let _: usize = conn.zadd(PAYMENTS_KEY, payment_json, timestamp)?;
+        let payment_as_string = serde_json::to_string(&payment).unwrap();
+        let _: () = conn.zadd(String::from(PAYMENTS_KEY), &payment_as_string, timestamp)?;
         Ok(payment.clone())
     }
 
@@ -125,5 +146,19 @@ impl Consumer for RedisRepository {
                 );
             }
         }
+    }
+}
+
+impl FromRedisValue for Payment {
+    fn from_redis_value(v: &redis::Value) -> RedisResult<Payment> {
+        let json_str: String = redis::from_redis_value(v)?;
+        let obj: Payment = serde_json::from_str(&json_str).map_err(|e| {
+            let error_msg = format!("Failed to deserialize Payment: {}", e);
+            redis::RedisError::from(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                error_msg,
+            ))
+        })?;
+        Ok(obj)
     }
 }

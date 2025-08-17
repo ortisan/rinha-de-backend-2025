@@ -1,13 +1,15 @@
+use crate::application::http::http::HttpMethod;
 use crate::application::usecases::accept_payment::AcceptPaymentUsecase;
-use crate::application::usecases::create_payment::{CreatePaymentUsecase, UsecaseConfig};
+use crate::application::usecases::create_payment::{CreatePaymentUseCase, UseCaseConfig};
 use crate::application::usecases::get_payments_summary::GetPaymentsSummaryUsecase;
 use crate::constants::{DEFAULT_PAYMENT_PROCESSOR_HEALTH, FALLBACK_PAYMENT_PROCESSOR_HEALTH};
+use crate::infrastructure::health_checker::{HealthCheckConfig, HealthChecker};
 use crate::infrastructure::redis::{RedisConfig, RedisRepository};
-use crate::presentation::health_checker::{HealthCheckConfig, HealthChecker};
+use crate::infrastructure::reqwest::HttpReqwest;
 use crate::presentation::payment_routes;
 use crate::presentation::worker::Worker;
 use actix_web::middleware::Logger;
-use actix_web::{App, HttpServer, web};
+use actix_web::{web, App, HttpServer};
 use env_logger;
 use log::{debug, error};
 use redis::Client;
@@ -15,7 +17,6 @@ use reqwest;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio;
-use tokio::time::interval;
 
 mod application;
 mod constants;
@@ -30,6 +31,9 @@ async fn main() -> infrastructure::Result<()> {
     let redis_config = RedisConfig { uri: redis_uri };
     let redis_repository = Arc::new(RedisRepository::new(redis_config));
 
+    let http_client = Arc::new(reqwest::Client::new());
+    let http_requestor = Arc::new(HttpReqwest::new(http_client.clone()));
+
     let accept_payment_usecase = AcceptPaymentUsecase::new(redis_repository.clone());
     let app_data_accept_payment_usecase = web::Data::new(accept_payment_usecase);
 
@@ -37,34 +41,32 @@ async fn main() -> infrastructure::Result<()> {
         .expect("PAYMENT_PROCESSOR_DEFAULT_URL not found");
     let payment_processor_fallback_url = dotenv::var("PAYMENT_PROCESSOR_FALLBACK_URL")
         .expect("PAYMENT_PROCESSOR_FALLBACK_URL not found");
-    let create_payment_config = UsecaseConfig {
+    let create_payment_config = UseCaseConfig {
         payment_processor_default_url,
         payment_processor_fallback_url,
     };
 
-    // let payment_repository = Arc::new(PostgresPaymentRepository::new(db_config));
     let get_summary_usecase = GetPaymentsSummaryUsecase::new(redis_repository.clone());
     let app_data_get_summary_usecase = web::Data::new(get_summary_usecase);
-
-    let http_client = Arc::new(reqwest::Client::new());
 
     let health_config_default_url = dotenv::var("HEALTH_CHECKER_DEFAULT_URL")?;
     let health_config_fallback_url = dotenv::var("HEALTH_CHECKER_FALBACK_URL")?;
     let health_check_default_config = HealthCheckConfig {
         url: health_config_default_url,
+        method: HttpMethod::GET,
         cache_key_name: String::from(DEFAULT_PAYMENT_PROCESSOR_HEALTH),
         cache_ttl_seconds: 5,
     };
     let health_check_fallback_config = HealthCheckConfig {
         url: health_config_fallback_url,
+        method: HttpMethod::GET,
         cache_key_name: String::from(FALLBACK_PAYMENT_PROCESSOR_HEALTH),
         cache_ttl_seconds: 5,
     };
 
-    let payment_repository = Arc::new(RedisRepository::new(redis_config));
-    let redis_client = Client::open(redis_uri)?;
     let health_checker = Arc::new(HealthChecker::new(
-        http_client.clone(),
+        redis_repository.clone(),
+        http_requestor.clone(),
         health_check_default_config.clone(),
         health_check_fallback_config.clone(),
     ));
@@ -86,15 +88,15 @@ async fn main() -> infrastructure::Result<()> {
     }
 
     {
-        let create_payment_usecase = Arc::new(CreatePaymentUsecase::new(
+        let create_payment_usecase = Arc::new(CreatePaymentUseCase::new(
             create_payment_config,
-            payment_repository.clone(),
-            http_client.clone(),
+            redis_repository.clone(),
+            http_requestor.clone(),
             health_checker.clone(),
         ));
-        let redis_client_listener_payment = redis_client.clone();
+
         tokio::spawn(async move {
-            let worker = Worker::new(redis_client_listener_payment, create_payment_usecase);
+            let worker = Worker::new(redis_repository.clone(), create_payment_usecase);
             match worker.listen_for_payments().await {
                 Ok(_) => debug!("Worker finished"),
                 Err(e) => error!("Worker error: {:?}", e),

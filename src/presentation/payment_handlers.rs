@@ -1,7 +1,7 @@
 use crate::application::domain::payment::{GetPaymentsFilter, Payment};
 use crate::application::usecases::accept_payment::AcceptPaymentUsecase;
 use crate::application::usecases::get_payments_summary::GetPaymentsSummaryUsecase;
-use crate::application::usecases::usecase::Usecase;
+use crate::application::usecases::usecase::UseCase;
 use crate::presentation::data::{
     GetPaymentsSummaryFilter, PaymentRequest, PaymentResponse, PaymentsSummaryResponse,
 };
@@ -13,8 +13,7 @@ pub async fn create_payment(
     payment_data: web::Json<PaymentRequest>,
 ) -> HttpResponse {
     let payment = &Payment::from(payment_data.into_inner());
-
-    let acccept_payment_result = usecase.execute(payment).await;
+    let acccept_payment_result = usecase.execute(payment.clone()).await;
     match acccept_payment_result {
         Ok(payment) => {
             let payment_response = PaymentResponse::from(&payment);

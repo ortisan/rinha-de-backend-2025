@@ -3,6 +3,6 @@ use crate::application::domain::payment::Payment;
 use crate::infrastructure;
 
 #[async_trait]
-pub trait Publisher {
+pub trait Publisher: Send + Sync {
     async fn publish_accepted_payment(&self, payment: &Payment) -> infrastructure::Result<()>;
 }

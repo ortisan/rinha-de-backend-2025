@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use crate::infrastructure;
 
 #[async_trait]
-pub trait PaymentRepository {
+pub trait PaymentRepository: Send + Sync {
     async fn create(&self, payment: &Payment) -> infrastructure::Result<Payment>;
     async fn get_summary(
         &self,
