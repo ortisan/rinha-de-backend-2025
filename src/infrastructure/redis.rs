@@ -6,15 +6,14 @@ use crate::application::repositories::payment_repository::PaymentRepository;
 use crate::constants::{ACCEPTED_PAYMENT_CHANNEL, PAYMENTS_KEY};
 use crate::infrastructure;
 use chrono::{DateTime, Utc};
-use diesel::r2d2;
 use log::{debug, error};
+use r2d2::{Pool, PooledConnection};
 use redis::{Client, Commands, FromRedisValue, RedisResult, ToRedisArgs, Value};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
-use diesel::r2d2::{Pool, PooledConnection};
 
 #[derive(Debug, Clone)]
 pub struct RedisConfig {

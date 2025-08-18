@@ -1,14 +1,8 @@
 # Build stage
-FROM rust:1.76-slim as builder
-LABEL authors="marcelo"
+FROM rust:1.84-slim as builder
+LABEL authors="Marcelo Ortiz de Santana"
 
 WORKDIR /app
-
-# Install dependencies
-RUN apt-get update && \
-    apt-get install -y pkg-config libssl-dev libpq-dev && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
 
 # Copy the Cargo files
 COPY Cargo.toml Cargo.lock ./
@@ -30,9 +24,9 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime certificates (no libpq or OpenSSL)
 RUN apt-get update && \
-    apt-get install -y libpq5 ca-certificates && \
+    apt-get install -y ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

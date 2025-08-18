@@ -1,9 +1,8 @@
 use chrono::serde::ts_nanoseconds;
 use chrono::{DateTime, Utc};
-use diesel::Queryable;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Payment {
     pub correlation_id: String,
     pub amount: f64,
